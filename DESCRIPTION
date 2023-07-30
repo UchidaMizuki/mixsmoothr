@@ -14,11 +14,14 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports: 
+    dplyr,
     extraDistr,
     flexmix,
     MASS,
     methods,
+    purrr,
     rlang,
     stats,
     stats4,
+    tibble,
     vctrs
