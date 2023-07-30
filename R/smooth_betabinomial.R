@@ -1,8 +1,8 @@
-FLXMR_beta_binomial_mixture <- function(formula = . ~ .,
-                                        offset = NULL) {
+FLXMR_betabinomial_mixture <- function(formula = . ~ .,
+                                       offset = NULL) {
   out <- methods::new("FLXMR",
                       weighted = TRUE,
-                      name = "beta_binomial_mixture",
+                      name = "betabinomial_mixture",
                       formula = formula,
                       offset = offset)
   out@defineComponent <- function(para) {
@@ -41,11 +41,11 @@ FLXMR_beta_binomial_mixture <- function(formula = . ~ .,
   out
 }
 
-flexmix_beta_binomial_mixture <- function(x, y, k, ...) {
+flexmix_betabinomial_mixture <- function(x, y, k, ...) {
   flexmix::flexmix(y ~ 1,
                    data = data_frame(y = y),
                    k = k,
-                   model = FLXMR_beta_binomial_mixture(offset = x),
+                   model = FLXMR_betabinomial_mixture(offset = x),
                    control = dots_list(minprior = 0, ...,
                                        .named = TRUE,
                                        .homonyms = "error"))
