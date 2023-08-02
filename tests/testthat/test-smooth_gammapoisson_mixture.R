@@ -11,9 +11,11 @@ test_that("fit_gammapoisson_mixture", {
 
     fitted <- fit_gammapoisson_mixture(x, y, 1,
                                        verbose = 1)
-    expect_equal(fitted$parameters[[1]]["alpha", ], alpha,
+    parameters <- fitted$parameters[[1]]
+    print(parameters)
+    expect_equal(parameters["alpha", ], alpha,
                  tolerance = 1e-1)
-    expect_equal(fitted$parameters[[1]]["beta", ], beta,
+    expect_equal(parameters["beta", ], beta,
                  tolerance = 1e-1)
   }
   test_fit_gammapoisson_mixture_1(3, 5)
@@ -36,6 +38,7 @@ test_that("fit_gammapoisson_mixture", {
                                        verbose = 1)
 
     parameters <- fitted$parameters[[1]]
+    print(parameters)
     expect_equal(parameters["prior", "inlier"] / prior_inlier, 1,
                  tolerance = 5e-1)
     expect_equal(parameters["alpha", "inlier"] / alpha_inlier, 1,

@@ -12,9 +12,11 @@ test_that("fit_betabinomial_mixture", {
 
     fitted <- fit_betabinomial_mixture(x, y, 1,
                                        verbose = 1)
-    expect_equal(fitted$parameters[[1]]["alpha", ] / alpha, 1,
+    parameters <- fitted$parameters[[1]]
+    print(parameters)
+    expect_equal(parameters["alpha", ] / alpha, 1,
                  tolerance = 1e-1)
-    expect_equal(fitted$parameters[[1]]["beta", ] / beta, 1,
+    expect_equal(parameters["beta", ] / beta, 1,
                  tolerance = 1e-1)
   }
   test_fit_betabinomial_mixture_1(3, 5)
@@ -37,6 +39,7 @@ test_that("fit_betabinomial_mixture", {
                                        verbose = 1)
 
     parameters <- fitted$parameters[[1]]
+    print(parameters)
     expect_equal(parameters["prior", "inlier"] / prior_inlier, 1,
                  tolerance = 1e-1)
     expect_equal(parameters["alpha", "inlier"] / alpha_inlier, 1,
