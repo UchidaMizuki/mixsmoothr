@@ -22,9 +22,13 @@ FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
                  predict = predict,
                  df = para$df)
   }
-  out@fit <- function(x, y, w) {
+  out@fit <- function(x, y, w, component) {
+    alpha <- component$alpha %||% 1
+    beta <- component$beta %||% 1
     fitted <- MASS::glm.nb(y ~ offset(log(offset)),
-                           weights = w)
+                           weights = w,
+                           start = log(alpha / beta),
+                           init.theta = alpha)
     out@defineComponent(para = list(alpha = fitted$theta,
                                     beta = fitted$theta / exp(stats::coef(fitted))[["(Intercept)"]],
                                     df = 2))

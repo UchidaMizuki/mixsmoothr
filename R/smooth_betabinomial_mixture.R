@@ -23,9 +23,10 @@ FLXMR_betabinomial_mixture <- function(formula = . ~ .,
                  predict = predict,
                  df = para$df)
   }
-  out@fit <- function(x, y, w) {
-    minuslogl <- function(alpha = 1,
-                          beta = 1) {
+  out@fit <- function(x, y, w, component) {
+    alpha <- component$alpha %||% 1
+    beta <- component$beta %||% 1
+    minuslogl <- function(alpha, beta) {
       -sum(w *
              extraDistr::dbbinom(y,
                                  size = offset,
@@ -34,6 +35,8 @@ FLXMR_betabinomial_mixture <- function(formula = . ~ .,
                                  log = TRUE))
     }
     fitted <- stats4::mle(minuslogl,
+                          start = c(alpha = alpha,
+                                    beta = beta),
                           lower = vec_rep(.Machine$double.eps, 2))
     out@defineComponent(para = list(alpha = fitted@coef[["alpha"]],
                                     beta = fitted@coef[["beta"]],
