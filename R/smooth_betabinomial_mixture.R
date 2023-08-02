@@ -66,6 +66,7 @@ flexmix_betabinomial_mixture <- function(k, x, y, ...) {
                  BIC = stats::BIC(fitted))
 }
 
+#' @export
 fit_betabinomial_mixture <- function(x, y, k, ...) {
   fitted <- purrr::map(k,
                        flexmix_betabinomial_mixture,
@@ -74,6 +75,7 @@ fit_betabinomial_mixture <- function(x, y, k, ...) {
   purrr::list_rbind(fitted)
 }
 
+#' @export
 smooth_betabinomial_mixture <- function(fitted, x, y) {
   fitted <- vec_slice(fitted, which.min(fitted$BIC))
   parameters <- dplyr::first(fitted$parameters)

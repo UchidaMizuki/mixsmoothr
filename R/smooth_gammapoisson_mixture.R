@@ -56,6 +56,7 @@ flexmix_gammapoisson_mixture <- function(k, x, y, ...) {
                  BIC = stats::BIC(fitted))
 }
 
+#' @export
 fit_gammapoisson_mixture <- function(x, y, k, ...) {
   fitted <- purrr::map(k,
                        flexmix_gammapoisson_mixture,
@@ -64,6 +65,7 @@ fit_gammapoisson_mixture <- function(x, y, k, ...) {
   purrr::list_rbind(fitted)
 }
 
+#' @export
 smooth_gammapoisson_mixture <- function(fitted, x, y) {
   fitted <- vec_slice(fitted, which.min(fitted$BIC))
   parameters <- dplyr::first(fitted$parameters)
