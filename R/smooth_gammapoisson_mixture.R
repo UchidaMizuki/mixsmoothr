@@ -37,7 +37,7 @@ FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
 }
 
 variance_gamma <- function(alpha, beta) {
-  alpha * beta ^ 2
+  alpha / beta ^ 2
 }
 
 flexmix_gammapoisson_mixture <- function(k, x, y, ...) {
