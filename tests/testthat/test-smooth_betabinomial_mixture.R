@@ -56,4 +56,9 @@ test_that("fit_betabinomial_mixture", {
                                 beta_inlier = 1,
                                 alpha_outlier = 3,
                                 beta_outlier = 5)
+  test_fit_betabinomial_mixture(prior_inlier = 0.75,
+                                alpha_inlier = 2,
+                                beta_inlier = 11,
+                                alpha_outlier = 10,
+                                beta_outlier = 3)
 })

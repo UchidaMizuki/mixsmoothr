@@ -51,8 +51,13 @@ test_that("fit_gammapoisson_mixture", {
                  tolerance = 5e-1)
   }
   test_fit_gammapoisson_mixture(prior_inlier = 0.25,
-                                alpha_inlier = 10,
-                                beta_inlier = 1,
-                                alpha_outlier = 3,
-                                beta_outlier = 5)
+                                alpha_inlier = 3,
+                                beta_inlier = 5,
+                                alpha_outlier = 10,
+                                beta_outlier = 1)
+  test_fit_gammapoisson_mixture(prior_inlier = 0.75,
+                                alpha_inlier = 3,
+                                beta_inlier = 10,
+                                alpha_outlier = 10,
+                                beta_outlier = 3)
 })
