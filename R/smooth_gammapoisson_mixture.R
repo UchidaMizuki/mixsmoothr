@@ -63,7 +63,7 @@ flexmix_gammapoisson_mixture <- function(k, y, x, control) {
                              model = FLXMR_gammapoisson_mixture(offset = x,
                                                                 control = control[["local_control"]]),
                              control = purrr::compact(list2(iter.max = control[["max_iter"]],
-                                                            minprior = 0,
+                                                            minprior = .Machine$double.eps,
                                                             verbose = as.numeric(control[["verbose"]]),
                                                             !!!control[!names(control) %in% c("max_iter", "verbose", "local_control")])))
   parameters <- rbind(flexmix::parameters(fitted),
