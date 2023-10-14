@@ -1,5 +1,5 @@
 FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
-                                       offset = NULL) {
+                                       offset, control) {
   out <- methods::new("FLXMR",
                       weighted = TRUE,
                       name = "gammapoisson_mixture",
@@ -25,33 +25,51 @@ FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
   out@fit <- function(x, y, w, component) {
     alpha <- component$alpha %||% 1
     beta <- component$beta %||% 1
-    fitted <- MASS::glm.nb(y ~ offset(log(offset)),
-                           weights = w,
-                           start = log(alpha / beta),
-                           init.theta = alpha)
-    out@defineComponent(para = list(alpha = fitted$theta,
-                                    beta = fitted$theta / exp(stats::coef(fitted))[["(Intercept)"]],
+    minuslogl <- function(alpha, beta) {
+      -sum(w *
+             stats::dnbinom(y,
+                            size = alpha,
+                            mu = alpha / beta * offset,
+                            log = TRUE))
+    }
+    fitted <- stats4::mle(minuslogl,
+                          start = list(alpha = alpha,
+                                       beta = beta),
+                          lower = vec_rep(.Machine$double.eps, 2),
+                          control = purrr::compact(list(trace = control[["verbose"]],
+                                                        maxit = control[["max_iter"]],
+
+                                                        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
+                                                        factr = control[["tolerance"]] / .Machine$double.eps)))
+    out@defineComponent(para = list(alpha = fitted@coef[["alpha"]],
+                                    beta = fitted@coef[["beta"]],
                                     df = 2))
   }
   out
 }
 
-variance_gamma <- function(alpha, beta) {
+mean_gamma <- function(alpha, beta) {
+  alpha / beta
+}
+
+var_gamma <- function(alpha, beta) {
   alpha / beta ^ 2
 }
 
-flexmix_gammapoisson_mixture <- function(k, x, y, ...) {
+flexmix_gammapoisson_mixture <- function(k, y, x, control) {
   fitted <- flexmix::flexmix(y ~ 1,
                              data = data_frame(y = y),
                              k = k,
-                             model = FLXMR_gammapoisson_mixture(offset = x),
-                             control = dots_list(minprior = 0, ...,
-                                                 .named = TRUE,
-                                                 .homonyms = "error"))
+                             model = FLXMR_gammapoisson_mixture(offset = x,
+                                                                control = control[["local_control"]]),
+                             control = purrr::compact(list2(iter.max = control[["max_iter"]],
+                                                            minprior = 0,
+                                                            verbose = as.numeric(control[["verbose"]]),
+                                                            !!!control[!names(control) %in% c("max_iter", "verbose", "local_control")])))
   parameters <- rbind(flexmix::parameters(fitted),
                       prior = flexmix::prior(fitted))
-  loc_inlier <- which.min(variance_gamma(alpha = parameters["alpha", ],
-                                         beta = parameters["beta", ]))
+  loc_inlier <- which.min(var_gamma(alpha = parameters["alpha", ],
+                                    beta = parameters["beta", ]))
   colnames(parameters) <- vec_rep("outlier", ncol(parameters))
   colnames(parameters)[loc_inlier] <- "inlier"
 
@@ -61,18 +79,20 @@ flexmix_gammapoisson_mixture <- function(k, x, y, ...) {
 }
 
 #' @export
-fit_gammapoisson_mixture <- function(x, y, k, ...) {
+smooth_gammapoisson_mixture <- function(y, x, k,
+                                        control = control_smooth()) {
   fitted <- purrr::map(k,
                        flexmix_gammapoisson_mixture,
+                       y = y,
                        x = x,
-                       y = y, ...)
-  purrr::list_rbind(fitted)
+                       control = control)
+  structure(purrr::list_rbind(fitted),
+            class = "smooth_gammapoisson_mixture")
 }
 
 #' @export
-smooth_gammapoisson_mixture <- function(fitted, x, y) {
-  fitted <- vec_slice(fitted, which.min(fitted$BIC))
-  parameters <- dplyr::first(fitted$parameters)
+predict.smooth_gammapoisson_mixture <- function(object, y, x) {
+  parameters <- object$parameters[[which.min(object$BIC)]]
   alpha <- parameters["alpha", ,
                       drop = FALSE]
   beta <- parameters["beta", ,
@@ -93,8 +113,21 @@ smooth_gammapoisson_mixture <- function(fitted, x, y) {
 
   alpha_inlier <- alpha[, "inlier"]
   beta_inlier <- beta[, "inlier"]
-  tibble::tibble(rate = dplyr::case_match(type,
-                                          "inlier" ~ (y + alpha_inlier) / (x + beta_inlier),
-                                          "outlier" ~ alpha_inlier / beta_inlier),
-                 type = factor(type, c("inlier", "outlier")))
+  tibble::tibble(type = factor(type, c("inlier", "outlier")),
+                 alpha = dplyr::case_match(type,
+                                           "inlier" ~ y + alpha_inlier,
+                                           "outlier" ~ alpha_inlier),
+                 beta = dplyr::case_match(type,
+                                          "inlier" ~ x + beta_inlier,
+                                          "outlier" ~ beta_inlier),
+                 mean = dplyr::case_match(type,
+                                          "inlier" ~ mean_gamma(alpha = alpha,
+                                                                beta = beta),
+                                          "outlier" ~ mean_gamma(alpha = alpha,
+                                                                 beta = beta)),
+                 var = dplyr::case_match(type,
+                                         "inlier" ~ var_gamma(alpha = alpha,
+                                                              beta = beta),
+                                         "outlier" ~ var_gamma(alpha = alpha,
+                                                               beta = beta)))
 }

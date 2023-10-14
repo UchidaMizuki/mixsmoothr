@@ -1,5 +1,5 @@
 FLXMR_betabinomial_mixture <- function(formula = . ~ .,
-                                       offset = NULL) {
+                                       offset, control) {
   out <- methods::new("FLXMR",
                       weighted = TRUE,
                       name = "betabinomial_mixture",
@@ -35,9 +35,14 @@ FLXMR_betabinomial_mixture <- function(formula = . ~ .,
                                  log = TRUE))
     }
     fitted <- stats4::mle(minuslogl,
-                          start = c(alpha = alpha,
-                                    beta = beta),
-                          lower = vec_rep(.Machine$double.eps, 2))
+                          start = list(alpha = alpha,
+                                       beta = beta),
+                          lower = vec_rep(.Machine$double.eps, 2),
+                          control = purrr::compact(list(trace = control[["verbose"]],
+                                                        maxit = control[["max_iter"]],
+
+                                                        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
+                                                        factr = control[["tolerance"]] / .Machine$double.eps)))
     out@defineComponent(para = list(alpha = fitted@coef[["alpha"]],
                                     beta = fitted@coef[["beta"]],
                                     df = 2))
@@ -45,22 +50,28 @@ FLXMR_betabinomial_mixture <- function(formula = . ~ .,
   out
 }
 
-variance_beta <- function(alpha, beta) {
+mean_beta <- function(alpha, beta) {
+  alpha / (alpha + beta)
+}
+
+var_beta <- function(alpha, beta) {
   alpha * beta / (alpha + beta) ^ 2 / (alpha + beta + 1)
 }
 
-flexmix_betabinomial_mixture <- function(k, x, y, ...) {
+flexmix_betabinomial_mixture <- function(k, y, x, control) {
   fitted <- flexmix::flexmix(y ~ 1,
                              data = data_frame(y = y),
                              k = k,
-                             model = FLXMR_betabinomial_mixture(offset = x),
-                             control = dots_list(minprior = 0, ...,
-                                                 .named = TRUE,
-                                                 .homonyms = "error"))
+                             model = FLXMR_betabinomial_mixture(offset = x,
+                                                                control = control[["local_control"]]),
+                             control = purrr::compact(list2(iter.max = control[["max_iter"]],
+                                                            minprior = 0,
+                                                            verbose = as.numeric(control[["verbose"]]),
+                                                            !!!control[!names(control) %in% c("max_iter", "verbose", "local_control")])))
   parameters <- rbind(flexmix::parameters(fitted),
                       prior = flexmix::prior(fitted))
-  loc_inlier <- which.min(variance_beta(alpha = parameters["alpha", ],
-                                        beta = parameters["beta", ]))
+  loc_inlier <- which.min(var_beta(alpha = parameters["alpha", ],
+                                   beta = parameters["beta", ]))
   colnames(parameters) <- vec_rep("outlier", ncol(parameters))
   colnames(parameters)[loc_inlier] <- "inlier"
 
@@ -70,18 +81,20 @@ flexmix_betabinomial_mixture <- function(k, x, y, ...) {
 }
 
 #' @export
-fit_betabinomial_mixture <- function(x, y, k, ...) {
+smooth_betabinomial_mixture <- function(y, x, k,
+                                        control = control_smooth()) {
   fitted <- purrr::map(k,
                        flexmix_betabinomial_mixture,
+                       y = y,
                        x = x,
-                       y = y, ...)
-  purrr::list_rbind(fitted)
+                       control = control)
+  structure(purrr::list_rbind(fitted),
+            class = "smooth_betabinomial_mixture")
 }
 
 #' @export
-smooth_betabinomial_mixture <- function(fitted, x, y) {
-  fitted <- vec_slice(fitted, which.min(fitted$BIC))
-  parameters <- dplyr::first(fitted$parameters)
+predict.smooth_betabinomial_mixture <- function(object, y, x) {
+  parameters <- object$parameters[[which.min(object$BIC)]]
   alpha <- parameters["alpha", ,
                       drop = FALSE]
   beta <- parameters["beta", ,
@@ -103,8 +116,21 @@ smooth_betabinomial_mixture <- function(fitted, x, y) {
 
   alpha_inlier <- alpha[, "inlier"]
   beta_inlier <- beta[, "inlier"]
-  tibble::tibble(rate = dplyr::case_match(type,
-                                          "inlier" ~ (y + alpha_inlier) / (x + alpha_inlier + beta_inlier),
-                                          "outlier" ~ alpha_inlier / (alpha_inlier + beta_inlier)),
-                 type = factor(type, c("inlier", "outlier")))
+  tibble::tibble(type = factor(type, c("inlier", "outlier")),
+                 alpha = dplyr::case_match(type,
+                                           "inlier" ~ y + alpha_inlier,
+                                           "outlier" ~ alpha_inlier),
+                 beta = dplyr::case_match(type,
+                                          "inlier" ~ x - y + beta_inlier,
+                                          "outlier" ~ beta_inlier),
+                 mean = dplyr::case_match(type,
+                                          "inlier" ~ mean_beta(alpha = alpha,
+                                                               beta = beta),
+                                          "outlier" ~ mean_beta(alpha = alpha,
+                                                                beta = beta)),
+                 var = dplyr::case_match(type,
+                                         "inlier" ~ var_beta(alpha = alpha,
+                                                             beta = beta),
+                                         "outlier" ~ var_beta(alpha = alpha,
+                                                              beta = beta)))
 }

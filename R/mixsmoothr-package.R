@@ -5,5 +5,6 @@
 #' @import rlang
 #' @import vctrs
 #' @importClassesFrom flexmix FLXMR FLXcomponent
+#' @importFrom stats predict
 ## usethis namespace: end
 NULL
