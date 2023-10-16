@@ -25,24 +25,33 @@ FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
   out@fit <- function(x, y, w, component) {
     alpha <- component$alpha %||% 1
     beta <- component$beta %||% 1
-    minuslogl <- function(alpha, beta) {
+
+    get_par <- function(par) {
+      list(alpha = par[[1]],
+           beta = par[[2]])
+    }
+    minuslogl <- function(par) {
+      par <- get_par(par)
+      alpha <- par$alpha
+      beta <- par$beta
+
       -sum(w *
              stats::dnbinom(y,
                             size = alpha,
                             mu = alpha / beta * offset,
                             log = TRUE))
     }
-    fitted <- stats4::mle(minuslogl,
-                          start = list(alpha = alpha,
-                                       beta = beta),
-                          lower = vec_rep(.Machine$double.eps, 2),
-                          control = purrr::compact(list(trace = control[["verbose"]],
-                                                        maxit = control[["max_iter"]],
+    fitted <- stats::optim(c(alpha, beta), minuslogl,
+                           method = "L-BFGS-B",
+                           lower = vec_rep(sqrt(.Machine$double.eps), 2),
+                           control = purrr::compact(list(trace = control[["verbose"]],
+                                                         maxit = control[["max_iter"]],
 
-                                                        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
-                                                        factr = control[["tolerance"]] / .Machine$double.eps)))
-    out@defineComponent(para = list(alpha = fitted@coef[["alpha"]],
-                                    beta = fitted@coef[["beta"]],
+                                                         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
+                                                         factr = control[["tolerance"]] / .Machine$double.eps)))
+    par <- get_par(fitted$par)
+    out@defineComponent(para = list(alpha = par[["alpha"]],
+                                    beta = par[["beta"]],
                                     df = 2))
   }
   out
@@ -63,7 +72,7 @@ flexmix_gammapoisson_mixture <- function(k, y, x, control) {
                              model = FLXMR_gammapoisson_mixture(offset = x,
                                                                 control = control[["local_control"]]),
                              control = purrr::compact(list2(iter.max = control[["max_iter"]],
-                                                            minprior = .Machine$double.eps,
+                                                            minprior = sqrt(.Machine$double.eps),
                                                             verbose = as.numeric(control[["verbose"]]),
                                                             !!!control[!names(control) %in% c("max_iter", "verbose", "local_control")])))
   parameters <- rbind(flexmix::parameters(fitted),

@@ -26,25 +26,31 @@ FLXMR_betabinomial_mixture <- function(formula = . ~ .,
   out@fit <- function(x, y, w, component) {
     alpha <- component$alpha %||% 1
     beta <- component$beta %||% 1
-    minuslogl <- function(alpha, beta) {
+
+    get_par <- function(par) {
+      list(alpha = par[[1]],
+           beta = par[[2]])
+    }
+    minuslogl <- function(par) {
+      par <- get_par(par)
       -sum(w *
              extraDistr::dbbinom(y,
                                  size = offset,
-                                 alpha = alpha,
-                                 beta = beta,
+                                 alpha = par$alpha,
+                                 beta = par$beta,
                                  log = TRUE))
     }
-    fitted <- stats4::mle(minuslogl,
-                          start = list(alpha = alpha,
-                                       beta = beta),
-                          lower = vec_rep(.Machine$double.eps, 2),
-                          control = purrr::compact(list(trace = control[["verbose"]],
-                                                        maxit = control[["max_iter"]],
+    fitted <- stats::optim(c(alpha, beta), minuslogl,
+                           method = "L-BFGS-B",
+                           lower = vec_rep(sqrt(.Machine$double.eps), 2),
+                           control = purrr::compact(list(trace = control[["verbose"]],
+                                                         maxit = control[["max_iter"]],
 
-                                                        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
-                                                        factr = control[["tolerance"]] / .Machine$double.eps)))
-    out@defineComponent(para = list(alpha = fitted@coef[["alpha"]],
-                                    beta = fitted@coef[["beta"]],
+                                                         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
+                                                         factr = control[["tolerance"]] / .Machine$double.eps)))
+    par <- get_par(fitted$par)
+    out@defineComponent(para = list(alpha = par[["alpha"]],
+                                    beta = par[["beta"]],
                                     df = 2))
   }
   out
