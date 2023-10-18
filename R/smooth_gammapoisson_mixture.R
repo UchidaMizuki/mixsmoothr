@@ -44,11 +44,12 @@ FLXMR_gammapoisson_mixture <- function(formula = . ~ .,
     fitted <- stats::optim(c(alpha, beta), minuslogl,
                            method = "L-BFGS-B",
                            lower = vec_rep(sqrt(.Machine$double.eps), 2),
-                           control = purrr::compact(list(trace = control[["verbose"]],
-                                                         maxit = control[["max_iter"]],
+                           control = purrr::compact(list2(trace = control$verbose,
+                                                          maxit = control$max_iter,
 
-                                                         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
-                                                         factr = control[["tolerance"]] / .Machine$double.eps)))
+                                                          # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.fmin_l_bfgs_b.html
+                                                          factr = control$tolerance / .Machine$double.eps,
+                                                          !!!control$others)))
     par <- get_par(fitted$par)
     out@defineComponent(para = list(alpha = par[["alpha"]],
                                     beta = par[["beta"]],
@@ -66,15 +67,29 @@ var_gamma <- function(alpha, beta) {
 }
 
 flexmix_gammapoisson_mixture <- function(k, y, x, control) {
-  fitted <- flexmix::flexmix(y ~ 1,
-                             data = data_frame(y = y),
-                             k = k,
-                             model = FLXMR_gammapoisson_mixture(offset = x,
-                                                                control = control[["local_control"]]),
-                             control = purrr::compact(list2(iter.max = control[["max_iter"]],
-                                                            minprior = sqrt(.Machine$double.eps),
-                                                            verbose = as.numeric(control[["verbose"]]),
-                                                            !!!control[!names(control) %in% c("max_iter", "verbose", "local_control")])))
+  formula <- y ~ 1
+  data <- data_frame(y = y)
+  model <- FLXMR_gammapoisson_mixture(offset = x,
+                                      control = control$local_control)
+  fitted_init <- flexmix::stepFlexmix(formula = formula,
+                                      data = data,
+                                      k = k,
+                                      model = model,
+                                      control = purrr::compact(list2(minprior = sqrt(.Machine$double.eps),
+                                                                     iter.max = control$init_control$max_iter,
+                                                                     verbose = as.numeric(control$init_control$verbose),
+                                                                     !!!control$init_control$others)),
+                                      nrep = control$initial %||% 3,
+                                      verbose = control$init_control$verbose %||% TRUE)
+  fitted <- flexmix::flexmix(formula = formula,
+                             data = data,
+                             cluster = flexmix::posterior(fitted_init),
+                             model = model,
+                             control = purrr::compact(list2(minprior = sqrt(.Machine$double.eps),
+                                                            iter.max = control$max_iter,
+                                                            verbose = as.numeric(control$verbose),
+                                                            !!!control$others)))
+
   parameters <- rbind(flexmix::parameters(fitted),
                       prior = flexmix::prior(fitted))
   loc_inlier <- which.min(var_gamma(alpha = parameters["alpha", ],
@@ -100,7 +115,7 @@ smooth_gammapoisson_mixture <- function(y, x, k,
 }
 
 #' @export
-predict.smooth_gammapoisson_mixture <- function(object, y, x) {
+predict.smooth_gammapoisson_mixture <- function(object, y, x, ...) {
   parameters <- object$parameters[[which.min(object$BIC)]]
   alpha <- parameters["alpha", ,
                       drop = FALSE]
